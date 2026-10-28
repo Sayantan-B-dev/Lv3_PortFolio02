@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "3d-model-generation": {
+      "source": "eachlabs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/3d-model-generation/SKILL.md",
+      "computedHash": "f9fff75f4f58f6edc541377c98dda83faf1fe42ed82c1916291d1a3754052bf9"
+    }
+  }
+}

@@ -43,6 +43,7 @@ next-env.d.ts
 .agents/
 .claude/
 
-models/
+# models/
 
 commit.txt
+commit.js
