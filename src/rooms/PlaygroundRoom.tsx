@@ -3,6 +3,7 @@
 import type { RoomViewProps } from "@/components/RoomStage";
 import { RoomStage } from "@/components/RoomStage";
 import { FloatingCats } from "@/components/FloatingCats";
+import { Floating } from "@/components/Floating";
 import { SpaceTheater } from "@/components/SpaceTheater";
 import { StickyNote } from "@/components/StickyNote";
 import { Model } from "@/components/Model";
@@ -22,6 +23,7 @@ export function PlaygroundRoom({
   room,
   onDoor,
   onOpenLink,
+  onOpenMap,
   onReadNote,
   focusedDoorId,
   opening,
@@ -34,6 +36,7 @@ export function PlaygroundRoom({
       room={room}
       onDoor={onDoor}
       onOpenLink={onOpenLink}
+      onOpenMap={onOpenMap}
       focusedDoorId={focusedDoorId}
       opening={opening}
     >
@@ -44,38 +47,60 @@ export function PlaygroundRoom({
         onPlayingChange={onTheaterChange}
       />
 
-      <Model
-        url={MODELS.victorianTable}
-        fit="height"
-        size={VICTORIAN_TABLE.height}
-        position={[VICTORIAN_TABLE.x, 0, VICTORIAN_TABLE.z]}
-        rotation={[0, Math.PI / 2, 0]}
-        merge
-      />
+      <Floating
+        position={[VICTORIAN_TABLE.x, 0.1, VICTORIAN_TABLE.z]}
+        drift={0.14}
+        bob={0.1}
+        tilt={0.015}
+        phase={2.1}
+        pushId="coffee-table"
+      >
+        <Model
+          url={MODELS.victorianTable}
+          fit="height"
+          size={VICTORIAN_TABLE.height}
+          position={[0, 0, 0]}
+          rotation={[0, Math.PI / 2, 0]}
+          merge
+        />
 
-      <Model
-        url={MODELS.roundTable}
-        fit="height"
-        size={ROUND_TABLE.height}
-        position={[ROUND_TABLE.x, 0, ROUND_TABLE.z]}
-        merge
-        shadows={false}
-      />
+        {room.notes.map((note, index) => {
+          const spot = NOTE_SPOTS[index % NOTE_SPOTS.length];
+          return (
+            <StickyNote
+              key={note.id}
+              note={note}
+              position={[
+                spot.x - VICTORIAN_TABLE.x,
+                NOTE_Y,
+                spot.z - VICTORIAN_TABLE.z,
+              ]}
+              yaw={spot.yaw}
+              paper={spot.paper}
+              size={0.2}
+              onRead={onReadNote}
+            />
+          );
+        })}
+      </Floating>
 
-      {room.notes.map((note, index) => {
-        const spot = NOTE_SPOTS[index % NOTE_SPOTS.length];
-        return (
-          <StickyNote
-            key={note.id}
-            note={note}
-            position={[spot.x, NOTE_Y, spot.z]}
-            yaw={spot.yaw}
-            paper={spot.paper}
-            size={0.2}
-            onRead={onReadNote}
-          />
-        );
-      })}
+      <Floating
+        position={[ROUND_TABLE.x, 0.12, ROUND_TABLE.z]}
+        drift={0.16}
+        bob={0.12}
+        tilt={0.02}
+        phase={4.6}
+        pushId="round-table"
+      >
+        <Model
+          url={MODELS.roundTable}
+          fit="height"
+          size={ROUND_TABLE.height}
+          position={[0, 0, 0]}
+          merge
+          shadows={false}
+        />
+      </Floating>
     </RoomStage>
   );
 }

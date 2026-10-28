@@ -45,15 +45,17 @@ export type NoteContent = {
   links?: readonly NoteLink[];
 };
 
-/** A physical door on the cylinder wall, positioned by its angle. */
+/** A physical door centred on one flat wall of the hexagon. */
 export type DoorSpec = {
   id: string;
   label: string;
   /** Radians around the room; 0 is the front wall, PI the back wall. */
   angle: number;
   destination: RoomId;
-  /** Home doors travel directly; a themed door asks Home or Next. */
-  mode: "direct" | "choice" | "recenter";
+  /** Leaf and frame accent, one colour per destination. */
+  color: string;
+  /** Navigation order shown on the leaf plaque. */
+  order?: number;
 };
 
 export type RoomContent = {
@@ -63,11 +65,11 @@ export type RoomContent = {
   title: string;
   intro: string;
   arrivalTitle: string;
-  next?: ThemedRoomId;
+  next?: RoomId;
   palette: RoomPalette;
   /** Null keeps the home room sealed from the outside. */
   space: SpaceId | null;
-  /** Angular positions of the curved windows on the cylinder wall. */
+  /** Face angles of the hexagon that carry a window. */
   windows: readonly number[];
   doors: readonly DoorSpec[];
   frames: readonly FrameContent[];
@@ -100,8 +102,23 @@ export const THEMED_ROOM_ORDER: readonly ThemedRoomId[] = [
 
 export const ROOM_ORDER: readonly RoomId[] = ["home", ...THEMED_ROOM_ORDER];
 
-/** Windows on the side walls; the fourth opening on the right is the cinema balcony. */
-const ROOM_WINDOWS = [-1.1, -2.2, 2.2] as const;
+/** Face angles of the regular hexagon: one flat wall each. */
+export const ROOM_FACE_ANGLES = [
+  0,
+  Math.PI / 3,
+  (Math.PI * 2) / 3,
+  Math.PI,
+  (Math.PI * 4) / 3,
+  (Math.PI * 5) / 3,
+] as const;
+
+/** Themed rooms open four windows; face 0 holds the door and PI the content. */
+const ROOM_WINDOWS = [
+  Math.PI / 3,
+  (Math.PI * 2) / 3,
+  (Math.PI * 4) / 3,
+  (Math.PI * 5) / 3,
+] as const;
 
 const ROOM_TITLES: Record<ThemedRoomId, string> = {
   architect: "The Architect",
@@ -112,33 +129,41 @@ const ROOM_TITLES: Record<ThemedRoomId, string> = {
   gateway: "The Gateway",
 };
 
-/** Home has seven doors: one Home/recentre door plus the six destinations. */
-const HOME_DOORS: readonly DoorSpec[] = [
-  {
-    id: "home",
-    label: "Home",
-    angle: 0,
-    destination: "home",
-    mode: "recenter",
-  },
-  ...THEMED_ROOM_ORDER.map((id, index) => ({
+/** One colour per destination, shared by the Home door and the room itself. */
+export const DOOR_COLORS: Record<ThemedRoomId, string> = {
+  architect: "#7c9cbf",
+  gallery: "#b07cc9",
+  core: "#cf7a5a",
+  journey: "#8fae6f",
+  playground: "#d9a84e",
+  gateway: "#5fb3a1",
+};
+/** The gateway portal returns to the island, so it gets the warm home colour. */
+const HOME_PORTAL_COLOR = "#e8c9a3";
+
+/** Home has one numbered door on each of its six faces. */
+const HOME_DOORS: readonly DoorSpec[] = THEMED_ROOM_ORDER.map(
+  (id, index) => ({
     id: `home-${id}`,
     label: ROOM_TITLES[id],
-    angle: (Math.PI * 2 * (index + 1)) / 7,
+    angle: ROOM_FACE_ANGLES[index],
     destination: id,
-    mode: "direct" as const,
-  })),
-];
+    color: DOOR_COLORS[id],
+    order: index + 1,
+  }),
+);
 
 function themedDoor(id: ThemedRoomId): DoorSpec {
   const index = THEMED_ROOM_ORDER.indexOf(id);
-  const next = THEMED_ROOM_ORDER[(index + 1) % THEMED_ROOM_ORDER.length];
+  // The gateway closes the loop back on the home island instead of architect.
+  const next: RoomId =
+    id === "gateway" ? "home" : THEMED_ROOM_ORDER[index + 1];
   return {
     id: `${id}-door`,
-    label: `Next room: ${ROOM_TITLES[next]}`,
+    label: next === "home" ? "Home" : ROOM_TITLES[next],
     angle: 0,
     destination: next,
-    mode: "choice",
+    color: next === "home" ? HOME_PORTAL_COLOR : DOOR_COLORS[next],
   };
 }
 
@@ -195,9 +220,9 @@ export const ROOMS: Record<RoomId, RoomContent> = {
     notes: [
       {
         id: "home-note",
-        label: "Seven doors",
+        label: "Six portals",
         message:
-          "One door stays home. The other six lead to a room of this portfolio. Read the labels above each door.",
+          "Each numbered portal leads to one room of this portfolio. The map table in every room can take you anywhere.",
       },
     ],
   },
@@ -423,7 +448,7 @@ export const ROOMS: Record<RoomId, RoomContent> = {
         id: "playground-screen",
         label: "The screen",
         message:
-          "Press the red button beside the door to start the space cinema. The screen lights the room with whatever frame is playing.",
+          "Press the red button to start the space cinema. The screen lights the island with whatever frame is playing.",
       },
       {
         id: "playground-note",
@@ -441,7 +466,7 @@ export const ROOMS: Record<RoomId, RoomContent> = {
     title: "The Gateway",
     intro: "Contact, GitHub, LinkedIn and hiring information.",
     arrivalTitle: "The Gateway",
-    next: "architect",
+    next: "home",
     palette: SHELL_PALETTE,
     space: "space6",
     windows: ROOM_WINDOWS,

@@ -43,7 +43,7 @@ const SITE = {
 
 const UI = {
   shell: {
-    firstPaint: "Opening the doors",
+    firstPaint: "Opening the portals",
   },
   intro: {
     title: "Loading the portfolio",
@@ -102,7 +102,7 @@ const UI = {
       look: "look around",
       lookFine: "click the room to grab it",
       enterKeys: "E",
-      enter: "open the door",
+      enter: "enter the portal",
       interactKeys: "Click",
       interact: "pet cats, read notes and open links",
       noteKeys: "Click",
@@ -117,7 +117,7 @@ const UI = {
     touchControls: {
       move: "Left stick — walk",
       look: "Right stick — look around and aim",
-      enter: "Tap the door to continue",
+      enter: "Tap the portal to continue",
       interact: "Tap cats, notes and links",
       note: "Tap a note to read it",
       menu: "Tap your avatar for this menu",
@@ -134,9 +134,11 @@ const UI = {
     greeting: "Full Stack Developer",
     roomProgressAria: "Room progress",
     roomOf: (index: number, total: number) => `Room ${index} of ${total}`,
-    movementFine: "WASD walk · Space jumps · Shift runs · E opens doors · Esc menu",
+    movementFine:
+      "WASD walk · Space jumps · Shift runs · E enters portals · M map · Esc menu",
     doorPress: "Press",
-    doorToEnter: "to open",
+    doorToEnter: "to enter",
+    push: "Push",
   },
   prompts: {
     cinemaFine: "Click to start the show",
@@ -153,11 +155,15 @@ const UI = {
     stand: "Shift to stand",
     standCoarse: "Tap the room to stand",
   },
-  doorChoice: {
-    title: "Where to?",
-    home: "Home",
-    next: "Next room",
-    close: "Stay here",
+  map: {
+    eyebrow: "Navigation",
+    title: "Room map",
+    hint: "Pick any room to travel there. M or Esc closes the map.",
+    youAreHere: "You are here",
+    travel: "Travel",
+    open: "Map",
+    openAria: "Open the room map",
+    close: "Close the room map",
   },
   music: {
     title: "Root music",

@@ -16,6 +16,8 @@ export const READING_TABLE = { x: -3.25, z: 0.4, height: 0.82 } as const;
 export const READING_CHAIR = { x: -2.35, z: 0.4, height: 0.95 } as const;
 export const VICTORIAN_TABLE = { x: -2.2, z: 1.2, height: 0.85 } as const;
 export const BOOKCASE = { x: 4.15, z: 0.2, height: 2.7 } as const;
+/** The map table that opens the room map; present in every room. */
+export const NAVIGATOR = { x: 2.4, z: -1.35, height: 1.05 } as const;
 
 function readingSet(): FurnitureBox[] {
   return [
@@ -50,6 +52,17 @@ function bookcaseBox(): FurnitureBox {
   };
 }
 
+function navigatorBox(): FurnitureBox {
+  return {
+    id: "map-table",
+    x: NAVIGATOR.x,
+    z: NAVIGATOR.z,
+    width: 0.98,
+    depth: 0.72,
+    height: NAVIGATOR.height,
+  };
+}
+
 function roundTableBox(): FurnitureBox {
   return {
     id: "round-table",
@@ -74,11 +87,11 @@ function victorianBox(): FurnitureBox {
 }
 
 export const FURNITURE: Record<RoomId, readonly FurnitureBox[]> = {
-  home: [roundTableBox(), bookcaseBox()],
-  architect: [...readingSet(), bookcaseBox()],
-  gallery: [roundTableBox(), bookcaseBox()],
-  core: [...readingSet(), bookcaseBox()],
-  journey: [victorianBox(), bookcaseBox()],
-  playground: [victorianBox(), roundTableBox()],
-  gateway: [roundTableBox(), bookcaseBox()],
+  home: [roundTableBox(), bookcaseBox(), navigatorBox()],
+  architect: [...readingSet(), bookcaseBox(), navigatorBox()],
+  gallery: [roundTableBox(), bookcaseBox(), navigatorBox()],
+  core: [...readingSet(), bookcaseBox(), navigatorBox()],
+  journey: [victorianBox(), bookcaseBox(), navigatorBox()],
+  playground: [victorianBox(), roundTableBox(), navigatorBox()],
+  gateway: [roundTableBox(), bookcaseBox(), navigatorBox()],
 };

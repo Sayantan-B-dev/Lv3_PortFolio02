@@ -12,6 +12,9 @@ type WallTextProps = {
   fontSize?: number;
   fontWeight?: number;
   color?: string;
+  /** Draws a hard outline behind the letters, e.g. black on a portal name. */
+  outline?: string;
+  outlineWidth?: number;
   opacity?: number;
   fontFamily?: string;
   align?: "left" | "center";
@@ -52,6 +55,8 @@ export function WallText({
   fontSize = 48,
   fontWeight = 700,
   color = "#f6ebdd",
+  outline,
+  outlineWidth = 8,
   opacity = 1,
   fontFamily = '"Montenegrin Gothic One", serif',
   align = "center",
@@ -83,9 +88,12 @@ export function WallText({
 
       // No halo: a tight dark shadow keeps the letters crisp and readable
       // without the blurred glow that made the wall copy look out of focus.
-      context.shadowColor = "rgba(0, 0, 0, 0.6)";
-      context.shadowBlur = 6;
-      context.shadowOffsetY = 2;
+      // Outlined text skips it so the border stays a hard edge.
+      if (!outline) {
+        context.shadowColor = "rgba(0, 0, 0, 0.6)";
+        context.shadowBlur = 6;
+        context.shadowOffsetY = 2;
+      }
 
       // Canvas text has no automatic fit, so a long caption used to run past
       // the plane and clip. Step the size down until every wrapped line lands
@@ -110,7 +118,14 @@ export function WallText({
         align === "left" ? HORIZONTAL_PADDING : canvas.width / 2;
 
       lines.forEach((line, index) => {
-        context.fillText(line, textX, startY + index * lineHeight);
+        const y = startY + index * lineHeight;
+        if (outline) {
+          context.lineJoin = "round";
+          context.strokeStyle = outline;
+          context.lineWidth = outlineWidth;
+          context.strokeText(line, textX, y);
+        }
+        context.fillText(line, textX, y);
       });
 
       const nextTexture = new CanvasTexture(canvas);
@@ -136,7 +151,18 @@ export function WallText({
       cancelled = true;
       drawn?.dispose();
     };
-  }, [text, width, height, fontSize, fontWeight, color, fontFamily, align]);
+  }, [
+    text,
+    width,
+    height,
+    fontSize,
+    fontWeight,
+    color,
+    outline,
+    outlineWidth,
+    fontFamily,
+    align,
+  ]);
 
   // A plane without its texture would render as a solid white block.
   if (!texture) return null;

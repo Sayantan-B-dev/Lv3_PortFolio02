@@ -5,51 +5,52 @@ import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   BufferGeometry,
   CircleGeometry,
-  CylinderGeometry,
-  DoubleSide,
   Float32BufferAttribute,
-  Mesh,
-  MeshBasicMaterial,
   MeshStandardMaterial,
   Points,
   RepeatWrapping,
-  SRGBColorSpace,
   Vector3,
   type Group,
+  type Mesh,
   type Object3D,
   type Texture,
 } from "three";
-import type { RoomPalette } from "@/content/rooms";
+import { getModelScene, getPreparedModel } from "@/scene/assets";
 import { MODELS, type SpaceId } from "@/content/models";
-import { getImageTexture, getModelScene, getPreparedModel } from "@/scene/assets";
+import type { RoomPalette } from "@/content/rooms";
 import { Model } from "./Model";
 
-/** One round room, shared by the home hub and every themed room. */
+/** The floating island's radius. There are no walls beyond this edge. */
 export const ROOM_RADIUS = 6;
 export const ROOM_HEIGHT = 4.5;
-export const ROOM_WALL_THICKNESS = 0.2;
-
-const SPAWN_RADIUS = 2.8;
-/** The visitor lands facing the content wall at the back of the room. */
-export const ROOM_SPAWN: [number, number, number] = [0, 1.7, SPAWN_RADIUS];
-
-const WINDOW_ARC = 0.42;
-const WINDOW_SILL = 1.2;
-const WINDOW_HEIGHT = 1.5;
-const DOOR_ARC = 0.16;
-/** The cinema balcony: a full-height opening aligned with the screen. */
-const BALCONY_ANGLE = 1.1;
-const BALCONY_ARC = 0.55;
+export const ROOM_SPAWN = [0, 1.7, 2.8] as const;
 
 const SPACE_SIZE = 280;
 const STARFIELD_SPIN_SPEED = 0.14;
 const SPACE_CLEAR_RADIUS = ROOM_RADIUS + 2.4;
 const SPACE_CLEAR_BOTTOM = -1.5;
-const SPACE_CLEAR_TOP = ROOM_HEIGHT + 2.5;
+const SPACE_CLEAR_TOP = ROOM_HEIGHT + 3.5;
 
-type Opening = { start: number; end: number };
+/** Deterministic pseudo-random in [0, 1). */
+function hash(value: number) {
+  return Math.abs(Math.sin(value * 12.9898) * 43758.5453) % 1;
+}
 
-/** Drop the points that would sit inside the room, keeping the rest. */
+/** Keeps a walker on the island's circular floor. */
+export function clampToFloor(
+  x: number,
+  z: number,
+  margin: number,
+): [number, number] {
+  const limit = Math.max(0, ROOM_RADIUS - margin);
+  const distance = Math.hypot(x, z);
+  if (distance <= limit) return [x, z];
+
+  const scale = limit / distance;
+  return [x * scale, z * scale];
+}
+
+/** Drop the points that would sit inside the island, keeping the rest. */
 function clearPointsInsideRoom(model: Object3D) {
   model.updateMatrixWorld(true);
   const world = new Vector3();
@@ -136,42 +137,128 @@ function Starfield({ space }: { space: SpaceId }) {
   );
 }
 
-type RoomShellProps = {
-  palette: RoomPalette;
-  wallTexture: string;
-  /** Angular positions of the side windows. */
-  windows: readonly number[];
-  /** Angular positions of every door opening. */
-  doorAngles: readonly number[];
-  space: SpaceId | null;
-  children: ReactNode;
-};
+/**
+ * Home has no authored skybox, so it gets a cheap generated starfield that is
+ * there from the first frame instead of waiting on another room's asset.
+ */
+function ProceduralStars() {
+  const groupRef = useRef<Group>(null);
 
-/** A curved wall, baseboard, crown or glass pane between two angles. */
-function Arc({
-  radius,
-  height,
-  y,
-  start,
-  length,
-  material,
-}: {
-  radius: number;
-  height: number;
-  y: number;
-  start: number;
-  length: number;
-  material: MeshStandardMaterial | MeshBasicMaterial;
-}) {
-  const geometry = useMemo(
-    () =>
-      new CylinderGeometry(radius, radius, height, 32, 1, true, start, length),
-    [radius, height, start, length],
-  );
+  const geometry = useMemo(() => {
+    const count = 900;
+    const positions = new Float32Array(count * 3);
+
+    for (let index = 0; index < count; index += 1) {
+      const angle = index * 2.399963;
+      const height = hash(index * 1.7 + 0.3) * 2 - 1;
+      const ring = Math.sqrt(1 - height * height);
+      const radius = 42 + hash(index * 3.1 + 1.3) * 78;
+
+      positions[index * 3] = Math.cos(angle) * ring * radius;
+      positions[index * 3 + 1] = height * radius;
+      positions[index * 3 + 2] = Math.sin(angle) * ring * radius;
+    }
+
+    const buffer = new BufferGeometry();
+    buffer.setAttribute("position", new Float32BufferAttribute(positions, 3));
+    return buffer;
+  }, []);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
 
-  return <mesh geometry={geometry} position={[0, y, 0]} material={material} />;
+  useFrame((_, delta) => {
+    const group = groupRef.current;
+    if (!group) return;
+    group.rotation.y += Math.min(delta, 0.05) * STARFIELD_SPIN_SPEED;
+  });
+
+  return (
+    <group ref={groupRef}>
+      <points geometry={geometry}>
+        <pointsMaterial
+          color="#f2e8ff"
+          size={0.9}
+          sizeAttenuation
+          transparent
+          opacity={0.85}
+          depthWrite={false}
+        />
+      </points>
+    </group>
+  );
+}
+
+/** A custom floating ring of light instead of a ceiling model. */
+function CeilingRing({ palette }: { palette: RoomPalette }) {
+  const groupRef = useRef<Group>(null);
+
+  useFrame(({ clock }, delta) => {
+    const group = groupRef.current;
+    if (!group) return;
+
+    const t = clock.elapsedTime;
+    group.position.y = ROOM_HEIGHT - 0.35 + Math.sin(t * 0.6) * 0.07;
+    group.rotation.y += Math.min(delta, 0.05) * 0.55;
+  });
+
+  return (
+    <group ref={groupRef} position={[0, ROOM_HEIGHT - 0.35, 0]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[3.5, 0.09, 16, 96]} />
+        <meshStandardMaterial
+          color={palette.trim}
+          emissive={palette.light}
+          emissiveIntensity={0.35}
+          roughness={0.42}
+          metalness={0.35}
+        />
+      </mesh>
+
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.25, 0.045, 12, 80]} />
+        <meshStandardMaterial
+          color={palette.trim}
+          emissive={palette.light}
+          emissiveIntensity={0.5}
+          roughness={0.38}
+          metalness={0.4}
+        />
+      </mesh>
+
+      {Array.from({ length: 6 }, (_, index) => {
+        const angle = (Math.PI / 3) * index;
+        return (
+          <group key={`spoke-${index}`} rotation={[0, angle, 0]}>
+            <mesh position={[1.75, 0, 0]}>
+              <boxGeometry args={[3.5, 0.045, 0.1]} />
+              <meshStandardMaterial
+                color={palette.trim}
+                roughness={0.5}
+                metalness={0.3}
+              />
+            </mesh>
+            <mesh position={[3.5, -0.12, 0]}>
+              <sphereGeometry args={[0.11, 16, 16]} />
+              <meshStandardMaterial
+                color={palette.light}
+                emissive={palette.light}
+                emissiveIntensity={1.6}
+                toneMapped={false}
+              />
+            </mesh>
+          </group>
+        );
+      })}
+
+      <pointLight
+        position={[0, -0.3, 0]}
+        color={palette.light}
+        intensity={9}
+        distance={14}
+        decay={1.4}
+      />
+    </group>
+  );
 }
 
 function TiledFloor({ fallback }: { fallback: string }) {
@@ -229,178 +316,63 @@ function TiledFloor({ fallback }: { fallback: string }) {
   );
 }
 
-function usePlasterTexture(url: string) {
-  return useMemo(() => {
-    try {
-      const texture = getImageTexture(url);
-      if (!texture) return null;
-      texture.wrapS = RepeatWrapping;
-      texture.wrapT = RepeatWrapping;
-      texture.repeat.set(1, 1);
-      texture.colorSpace = SRGBColorSpace;
-      texture.needsUpdate = true;
-      return texture;
-    } catch {
-      return null;
-    }
-  }, [url]);
-}
+type RoomShellProps = {
+  palette: RoomPalette;
+  space: SpaceId | null;
+  children: ReactNode;
+};
 
-function wallSegments(openings: Opening[]): Opening[] {
-  const sorted = openings
-    .map((opening) => {
-      const length = opening.end - opening.start;
-      const mid = (opening.start + opening.end) / 2;
-      const center = Math.atan2(Math.sin(mid), Math.cos(mid));
-      return {
-        start: Math.max(-Math.PI, center - length / 2),
-        end: Math.min(Math.PI, center + length / 2),
-      };
-    })
-    .filter((opening) => opening.end > opening.start)
-    .sort((a, b) => a.start - b.start);
-
-  const merged: Opening[] = [];
-  for (const opening of sorted) {
-    const last = merged[merged.length - 1];
-    if (last && opening.start <= last.end) {
-      last.end = Math.max(last.end, opening.end);
-    } else {
-      merged.push({ ...opening });
-    }
-  }
-
-  const segments: Opening[] = [];
-  let cursor = -Math.PI;
-  for (const opening of merged) {
-    if (opening.start > cursor) {
-      segments.push({ start: cursor, end: opening.start });
-    }
-    cursor = Math.max(cursor, opening.end);
-  }
-  if (cursor < Math.PI) segments.push({ start: cursor, end: Math.PI });
-  return segments;
-}
-
-/** x = R sin a, z = R cos a, matching three's cylinder theta. */
-function onCircle(radius: number, angle: number): [number, number] {
-  return [Math.sin(angle) * radius, Math.cos(angle) * radius];
-}
-
-export function RoomShell({
-  palette,
-  wallTexture,
-  windows,
-  doorAngles,
-  space,
-  children,
-}: RoomShellProps) {
-  const wallMap = usePlasterTexture(wallTexture);
-
-  const trimMaterial = useMemo(
+export function RoomShell({ palette, space, children }: RoomShellProps) {
+  const rimMaterial = useMemo(
     () =>
       new MeshStandardMaterial({
         color: palette.trim,
-        roughness: 0.62,
-        metalness: 0.1,
+        roughness: 0.48,
+        metalness: 0.32,
       }),
     [palette.trim],
   );
 
-  const wallMaterial = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: palette.wall,
-        map: wallMap ?? undefined,
-        roughness: 0.94,
-        metalness: 0,
-        side: DoubleSide,
-      }),
-    [palette.wall, wallMap],
-  );
-
-  const glassMaterial = useMemo(
-    () =>
-      new MeshBasicMaterial({
-        color: palette.light,
-        transparent: true,
-        opacity: 0.13,
-        depthWrite: false,
-        side: DoubleSide,
-      }),
-    [palette.light],
-  );
-
-  const ceilingMaterial = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: palette.ceiling,
-        roughness: 0.95,
-        side: DoubleSide,
-      }),
-    [palette.ceiling],
-  );
-
-  useEffect(
-    () => () => {
-      trimMaterial.dispose();
-      wallMaterial.dispose();
-      glassMaterial.dispose();
-      ceilingMaterial.dispose();
-    },
-    [trimMaterial, wallMaterial, glassMaterial, ceilingMaterial],
-  );
-
-  const segments = useMemo(() => {
-    const openings: Opening[] = doorAngles.map((angle) => ({
-      start: angle - DOOR_ARC,
-      end: angle + DOOR_ARC,
-    }));
-
-    if (space) {
-      openings.push({
-        start: BALCONY_ANGLE - BALCONY_ARC,
-        end: BALCONY_ANGLE + BALCONY_ARC,
-      });
-    }
-
-    for (const angle of windows) {
-      openings.push({
-        start: angle - WINDOW_ARC / 2,
-        end: angle + WINDOW_ARC / 2,
-      });
-    }
-
-    return wallSegments(openings);
-  }, [doorAngles, space, windows]);
-
-  const ceilingGeometry = useMemo(
-    () => new CircleGeometry(ROOM_RADIUS, 96),
-    [],
-  );
-  useEffect(() => () => ceilingGeometry.dispose(), [ceilingGeometry]);
+  useEffect(() => () => rimMaterial.dispose(), [rimMaterial]);
 
   return (
     <>
-      <color attach="background" args={[space ? "#05040a" : "#120d14"]} />
+      <color attach="background" args={["#05040a"]} />
 
-      {space ? <Starfield space={space} /> : null}
+      {space ? <Starfield space={space} /> : <ProceduralStars />}
 
-      <ambientLight color={palette.light} intensity={0.66} />
+      <ambientLight color={palette.light} intensity={0.7} />
       <directionalLight
-        position={[0, 6.5, 0.8]}
+        position={[0, 7, 1]}
         color={palette.light}
-        intensity={1.05}
+        intensity={1}
       />
       <pointLight
-        position={[0, 3.3, 0.3]}
+        position={[0, 3, 0]}
         color={palette.light}
-        intensity={6}
+        intensity={5}
         distance={18}
         decay={1.5}
       />
 
       <TiledFloor fallback={palette.floor} />
+
+      {/* The island's edge: a wood ring and a dark underside. */}
+      <mesh
+        position={[0, 0.004, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        material={rimMaterial}
+      >
+        <ringGeometry args={[ROOM_RADIUS - 0.22, ROOM_RADIUS + 0.05, 96]} />
+      </mesh>
+      <mesh position={[0, -0.1, 0]}>
+        <cylinderGeometry args={[ROOM_RADIUS, ROOM_RADIUS, 0.18, 96]} />
+        <meshStandardMaterial
+          color={palette.ceiling}
+          roughness={0.95}
+          metalness={0}
+        />
+      </mesh>
 
       <Model
         url={MODELS.rug}
@@ -411,146 +383,7 @@ export function RoomShell({
         shadows={false}
       />
 
-      {segments.map((segment, index) => (
-        <Arc
-          key={`wall-${index}`}
-          radius={ROOM_RADIUS}
-          height={ROOM_HEIGHT}
-          y={ROOM_HEIGHT / 2}
-          start={segment.start}
-          length={segment.end - segment.start}
-          material={wallMaterial}
-        />
-      ))}
-
-      {segments.map((segment, index) => (
-        <group key={`trim-${index}`}>
-          <Arc
-            radius={ROOM_RADIUS - 0.02}
-            height={0.22}
-            y={0.11}
-            start={segment.start}
-            length={segment.end - segment.start}
-            material={trimMaterial}
-          />
-          <Arc
-            radius={ROOM_RADIUS - 0.02}
-            height={0.14}
-            y={ROOM_HEIGHT - 0.18}
-            start={segment.start}
-            length={segment.end - segment.start}
-            material={trimMaterial}
-          />
-        </group>
-      ))}
-
-      {windows.map((angle) => {
-        const [x, z] = onCircle(ROOM_RADIUS - 0.05, angle);
-        return (
-          <group key={`window-${angle}`} position={[x, 0, z]}>
-            <Arc
-              radius={ROOM_RADIUS - 0.06}
-              height={WINDOW_HEIGHT}
-              y={WINDOW_SILL + WINDOW_HEIGHT / 2}
-              start={angle - WINDOW_ARC / 2 + 0.02}
-              length={WINDOW_ARC - 0.04}
-              material={glassMaterial}
-            />
-            <Arc
-              radius={ROOM_RADIUS - 0.04}
-              height={0.1}
-              y={WINDOW_SILL}
-              start={angle - WINDOW_ARC / 2}
-              length={WINDOW_ARC}
-              material={trimMaterial}
-            />
-            <Arc
-              radius={ROOM_RADIUS - 0.04}
-              height={0.1}
-              y={WINDOW_SILL + WINDOW_HEIGHT}
-              start={angle - WINDOW_ARC / 2}
-              length={WINDOW_ARC}
-              material={trimMaterial}
-            />
-            {[-1, 1].map((side) => {
-              const edge = angle + (side * WINDOW_ARC) / 2;
-              const [ex, ez] = onCircle(ROOM_RADIUS - 0.04, edge);
-              return (
-                <mesh
-                  key={edge}
-                  position={[ex, WINDOW_SILL + WINDOW_HEIGHT / 2, ez]}
-                  rotation={[0, edge, 0]}
-                  material={trimMaterial}
-                >
-                  <boxGeometry args={[0.1, WINDOW_HEIGHT + 0.16, 0.14]} />
-                </mesh>
-              );
-            })}
-          </group>
-        );
-      })}
-
-      {space ? (
-        <group>
-          <Arc
-            radius={ROOM_RADIUS - 0.06}
-            height={ROOM_HEIGHT - 0.16}
-            y={ROOM_HEIGHT / 2}
-            start={BALCONY_ANGLE - BALCONY_ARC + 0.02}
-            length={BALCONY_ARC * 2 - 0.04}
-            material={glassMaterial}
-          />
-          <Arc
-            radius={ROOM_RADIUS - 0.04}
-            height={0.22}
-            y={0.11}
-            start={BALCONY_ANGLE - BALCONY_ARC}
-            length={BALCONY_ARC * 2}
-            material={trimMaterial}
-          />
-          <Arc
-            radius={ROOM_RADIUS - 0.04}
-            height={0.16}
-            y={ROOM_HEIGHT - 0.16}
-            start={BALCONY_ANGLE - BALCONY_ARC}
-            length={BALCONY_ARC * 2}
-            material={trimMaterial}
-          />
-          {[-1, 1].map((side) => {
-            const angle = BALCONY_ANGLE + side * BALCONY_ARC;
-            const [x, z] = onCircle(ROOM_RADIUS - 0.04, angle);
-            return (
-              <mesh
-                key={angle}
-                position={[x, ROOM_HEIGHT / 2, z]}
-                rotation={[0, angle, 0]}
-                material={trimMaterial}
-              >
-                <boxGeometry args={[0.12, ROOM_HEIGHT, 0.16]} />
-              </mesh>
-            );
-          })}
-        </group>
-      ) : null}
-
-      <mesh
-        position={[0, ROOM_HEIGHT, 0]}
-        rotation={[Math.PI / 2, 0, 0]}
-        geometry={ceilingGeometry}
-        material={ceilingMaterial}
-        receiveShadow
-      />
-
-      <Model
-        url={MODELS.ceilingTiles}
-        fit="width"
-        size={ROOM_RADIUS * 1.6}
-        stretch={[1, 1, 2.4]}
-        repeat={[1, 2.4]}
-        rotation={[Math.PI, 0, 0]}
-        position={[0, ROOM_HEIGHT - 0.07, 0]}
-        shadows={false}
-      />
+      <CeilingRing palette={palette} />
 
       {children}
     </>

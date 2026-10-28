@@ -17,6 +17,7 @@ import {
   SRGBColorSpace,
   Vector3,
   VideoTexture,
+  type Group,
   type Mesh,
 } from "three";
 import { Model } from "./Model";
@@ -40,6 +41,8 @@ type PictureFrameProps = {
   /** Opens this link when the frame is clicked instead of pinning the caption. */
   href?: string;
   onOpenLink?: (href: string) => void;
+  /** Turns the frame toward the visitor every frame. */
+  billboard?: boolean;
 };
 
 /** Captions only appear once the visitor is close enough to read them. */
@@ -284,8 +287,10 @@ export function PictureFrame({
   caption,
   href,
   onOpenLink,
+  billboard = true,
 }: PictureFrameProps) {
   const [width, height] = size;
+  const frameRef = useRef<Group>(null);
   const camera = useThree((state) => state.camera);
   const framePosition = useMemo(() => new Vector3(...position), [position]);
   const [hovered, setHovered] = useState(false);
@@ -312,6 +317,10 @@ export function PictureFrame({
   // Hover is mouse-only, so the crosshair also reveals a frame's caption when
   // the visitor is close enough to read it.
   useFrame(() => {
+    if (billboard && frameRef.current) {
+      frameRef.current.lookAt(camera.position);
+    }
+
     const hit = hitRef.current;
     if (!hit) return;
 
@@ -338,7 +347,7 @@ export function PictureFrame({
   const mouldingHeight = height + 0.3;
 
   return (
-    <group position={position} rotation={rotation}>
+    <group ref={frameRef} position={position} rotation={rotation}>
       {/* The imported moulding sits behind an inner trim box: the custom frame
           gives the silhouette, the box keeps the photo edge crisp. */}
       <Model

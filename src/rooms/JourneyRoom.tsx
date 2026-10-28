@@ -4,6 +4,7 @@ import type { RoomViewProps } from "@/components/RoomStage";
 import { RoomStage } from "@/components/RoomStage";
 import { StickyNote } from "@/components/StickyNote";
 import { Model } from "@/components/Model";
+import { Floating } from "@/components/Floating";
 import { MODELS } from "@/content/models";
 import { BOOKCASE, VICTORIAN_TABLE } from "@/content/layout";
 
@@ -20,6 +21,7 @@ export function JourneyRoom({
   room,
   onDoor,
   onOpenLink,
+  onOpenMap,
   onReadNote,
   focusedDoorId,
   opening,
@@ -29,41 +31,64 @@ export function JourneyRoom({
       room={room}
       onDoor={onDoor}
       onOpenLink={onOpenLink}
+      onOpenMap={onOpenMap}
       focusedDoorId={focusedDoorId}
       opening={opening}
     >
-      <Model
-        url={MODELS.bookcase}
-        fit="height"
-        size={BOOKCASE.height}
-        position={[BOOKCASE.x, 0, BOOKCASE.z]}
-        rotation={[0, -Math.PI / 2, 0]}
-        merge
-      />
+      <Floating
+        position={[BOOKCASE.x, 0.12, BOOKCASE.z]}
+        drift={0.24}
+        bob={0.16}
+        tilt={0.03}
+        phase={0.7}
+        pushId="bookcase"
+      >
+        <Model
+          url={MODELS.bookcase}
+          fit="height"
+          size={BOOKCASE.height}
+          position={[0, 0, 0]}
+          rotation={[0, -Math.PI / 2, 0]}
+          merge
+        />
+      </Floating>
 
-      <Model
-        url={MODELS.victorianTable}
-        fit="height"
-        size={VICTORIAN_TABLE.height}
-        position={[VICTORIAN_TABLE.x, 0, VICTORIAN_TABLE.z]}
-        rotation={[0, Math.PI / 2, 0]}
-        merge
-      />
+      <Floating
+        position={[VICTORIAN_TABLE.x, 0.1, VICTORIAN_TABLE.z]}
+        drift={0.14}
+        bob={0.1}
+        tilt={0.015}
+        phase={2.1}
+        pushId="coffee-table"
+      >
+        <Model
+          url={MODELS.victorianTable}
+          fit="height"
+          size={VICTORIAN_TABLE.height}
+          position={[0, 0, 0]}
+          rotation={[0, Math.PI / 2, 0]}
+          merge
+        />
 
-      {room.notes.map((note, index) => {
-        const spot = NOTE_SPOTS[index % NOTE_SPOTS.length];
-        return (
-          <StickyNote
-            key={note.id}
-            note={note}
-            position={[spot.x, NOTE_Y, spot.z]}
-            yaw={spot.yaw}
-            paper={spot.paper}
-            size={0.2}
-            onRead={onReadNote}
-          />
-        );
-      })}
+        {room.notes.map((note, index) => {
+          const spot = NOTE_SPOTS[index % NOTE_SPOTS.length];
+          return (
+            <StickyNote
+              key={note.id}
+              note={note}
+              position={[
+                spot.x - VICTORIAN_TABLE.x,
+                NOTE_Y,
+                spot.z - VICTORIAN_TABLE.z,
+              ]}
+              yaw={spot.yaw}
+              paper={spot.paper}
+              size={0.2}
+              onRead={onReadNote}
+            />
+          );
+        })}
+      </Floating>
     </RoomStage>
   );
 }

@@ -14,7 +14,7 @@ import {
   type PointsMaterial,
 } from "three";
 import { MODELS } from "@/content/models";
-import { ROOM_RADIUS } from "./RoomShell";
+import { clampToFloor } from "./RoomShell";
 import { Model } from "./Model";
 
 const CAT_MODEL = MODELS.cat;
@@ -26,7 +26,7 @@ const SPIN_DECAY = 5.5;
 const LOOK_RANGE = 10;
 /** A small sphere around the torso, not the whole space around the cat. */
 const BODY_RADIUS = 0.36;
-const WANDER_RADIUS = ROOM_RADIUS - 1.1;
+const WANDER_MARGIN = 1.1;
 const WANDER_Y_MIN = 1.7;
 const WANDER_Y_MAX = 3.15;
 const CAT_COUNT = 5;
@@ -204,13 +204,11 @@ function createWanderers(): Wanderer[] {
 function chooseWanderTarget(wanderer: Wanderer, spot: CatSpot) {
   const [baseX, baseY, baseZ] = spot.position;
 
-  let targetX = baseX + (Math.random() - 0.5) * 3.2;
-  let targetZ = baseZ + (Math.random() - 0.5) * 3.2;
-  const radius = Math.hypot(targetX, targetZ);
-  if (radius > WANDER_RADIUS) {
-    targetX *= WANDER_RADIUS / radius;
-    targetZ *= WANDER_RADIUS / radius;
-  }
+  const [targetX, targetZ] = clampToFloor(
+    baseX + (Math.random() - 0.5) * 3.2,
+    baseZ + (Math.random() - 0.5) * 3.2,
+    WANDER_MARGIN,
+  );
 
   wanderer.targetX = targetX;
   wanderer.targetY = Math.min(

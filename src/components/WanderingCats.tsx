@@ -13,11 +13,13 @@ import {
 import { FURNITURE } from "@/content/layout";
 import { MODELS } from "@/content/models";
 import { Model } from "./Model";
-import { ROOM_RADIUS } from "./RoomShell";
+import { clampToFloor, ROOM_RADIUS } from "./RoomShell";
 
 const CAT_MODEL = MODELS.catBox;
 const PET_MODEL = MODELS.limcaCat;
 const CAT_HEIGHT = 0.72;
+/** Cats hover a little above the floor now that nothing is anchored. */
+const HOVER_HEIGHT = 0.16;
 const CAT_RADIUS = 0.26;
 const PLAYER_RADIUS = 0.36;
 const PET_RANGE = 1.9;
@@ -25,7 +27,7 @@ const PET_SECONDS = 2.16;
 /** A cat that just changed back stays itself this long before changing again. */
 const PET_COOLDOWN_MS = 2000;
 /** Halfway up the cat, the point the look test aims at. */
-const PET_CENTER_Y = CAT_HEIGHT / 2;
+const PET_CENTER_Y = HOVER_HEIGHT + CAT_HEIGHT / 2;
 /** Looking counts as looking at the cat inside this radius of the crosshair. */
 const BODY_RADIUS = 0.34;
 const MAX_SPEED = 0.62;
@@ -33,9 +35,9 @@ const MAX_SPEED = 0.62;
 const TAP_TOLERANCE = 6;
 const STEER = 1.45;
 const DRAG = 1.6;
-const ROOM_LIMIT = ROOM_RADIUS - CAT_RADIUS - 0.45;
+const CAT_MARGIN = CAT_RADIUS + 0.45;
 
-const CAT_SPOTS: readonly (readonly [number, number])[] = [
+const RAW_SPOTS: readonly (readonly [number, number])[] = [
   [-3.55, 3.45],
   [-3.9, -0.8],
   [-0.15, 0.15],
@@ -56,6 +58,10 @@ const CAT_SPOTS: readonly (readonly [number, number])[] = [
   [-0.85, -2.55],
   [4.0, 4.9],
 ];
+
+const CAT_SPOTS: readonly (readonly [number, number])[] = RAW_SPOTS.map(
+  ([x, z]) => clampToFloor(x, z, CAT_MARGIN),
+);
 
 type CatState = {
   x: number;
@@ -95,11 +101,16 @@ function blockedByFurniture(x: number, z: number) {
 }
 
 function chooseTarget(cat: CatState) {
+  const range = ROOM_RADIUS - CAT_MARGIN;
+
   for (let attempt = 0; attempt < 30; attempt += 1) {
     const angle = Math.random() * Math.PI * 2;
-    const radius = Math.sqrt(Math.random()) * ROOM_LIMIT;
-    const x = Math.sin(angle) * radius;
-    const z = Math.cos(angle) * radius;
+    const radius = Math.sqrt(Math.random()) * range;
+    const [x, z] = clampToFloor(
+      Math.sin(angle) * radius,
+      Math.cos(angle) * radius,
+      CAT_MARGIN,
+    );
 
     if (blockedByFurniture(x, z)) continue;
     if (Math.hypot(x - cat.x, z - cat.z) < 1.1) continue;
@@ -114,12 +125,11 @@ function chooseTarget(cat: CatState) {
 }
 
 function keepCatInRoom(cat: CatState) {
-  const radius = Math.hypot(cat.x, cat.z);
-  if (radius <= ROOM_LIMIT) return;
+  const [x, z] = clampToFloor(cat.x, cat.z, CAT_MARGIN);
+  if (x === cat.x && z === cat.z) return;
 
-  const scale = ROOM_LIMIT / radius;
-  cat.x *= scale;
-  cat.z *= scale;
+  cat.x = x;
+  cat.z = z;
   cat.vx *= -0.35;
   cat.vz *= -0.35;
 }
@@ -369,7 +379,7 @@ export function WanderingCats({ onPet }: WanderingCatsProps) {
       const bob = petted ? 0 : Math.sin(time * 2.1 + cat.phase) * 0.012;
 
       if (group) {
-        group.position.set(cat.x, bob, cat.z);
+        group.position.set(cat.x, HOVER_HEIGHT + bob, cat.z);
 
         if (petted || Math.hypot(cat.vx, cat.vz) > 0.035) {
           const targetYaw = petted

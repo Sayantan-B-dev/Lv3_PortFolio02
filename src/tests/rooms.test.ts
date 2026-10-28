@@ -2,7 +2,9 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  DOOR_COLORS,
   ROOMS,
+  ROOM_FACE_ANGLES,
   ROOM_ORDER,
   START_ROOM,
   THEMED_ROOM_ORDER,
@@ -40,30 +42,46 @@ describe("room navigation", () => {
     }
   });
 
-  it("gives home seven doors and every room one choice door", () => {
-    expect(ROOMS.home.doors).toHaveLength(7);
-    expect(ROOMS.home.doors[0].mode).toBe("recenter");
+  it("gives home one numbered door on every hex face", () => {
+    expect(ROOMS.home.doors).toHaveLength(6);
+    expect(ROOMS.home.doors.map((door) => door.order)).toEqual([
+      1, 2, 3, 4, 5, 6,
+    ]);
+    expect(ROOMS.home.doors.map((door) => door.angle)).toEqual([
+      ...ROOM_FACE_ANGLES,
+    ]);
+    expect(new Set(ROOMS.home.doors.map((door) => door.destination)).size).toBe(
+      6,
+    );
+  });
+
+  it("gives every themed room one door coloured for its destination", () => {
     for (const id of THEMED_ROOM_ORDER) {
       expect(ROOMS[id].doors).toHaveLength(1);
-      expect(ROOMS[id].doors[0].mode).toBe("choice");
+      const door = ROOMS[id].doors[0];
+      expect(door.destination).toBe(getNextRoom(id).id);
+      const destinationColor =
+        DOOR_COLORS[door.destination as keyof typeof DOOR_COLORS];
+      if (destinationColor) expect(door.color).toBe(destinationColor);
+      expect(door.color).toMatch(/^#[0-9a-f]{6}$/i);
     }
   });
 
-  it("cycles architect through gateway back to architect", () => {
+  it("cycles architect through gateway back to home", () => {
     let room: RoomId = "architect";
     const visited: RoomId[] = [room];
 
     for (let step = 0; step < THEMED_ROOM_ORDER.length; step += 1) {
-      room = ROOMS[room].next ?? "architect";
+      room = ROOMS[room].next ?? "home";
       visited.push(room);
     }
 
-    expect(visited).toEqual([...THEMED_ROOM_ORDER, "architect"]);
+    expect(visited).toEqual([...THEMED_ROOM_ORDER, "home"]);
   });
 
-  it("wraps the gateway door back to architect", () => {
-    expect(ROOMS.gateway.doors[0].destination).toBe("architect");
-    expect(getNextRoom("gateway").id).toBe("architect");
+  it("wraps the gateway portal back to home", () => {
+    expect(ROOMS.gateway.doors[0].destination).toBe("home");
+    expect(getNextRoom("gateway").id).toBe("home");
   });
 
   it("derives the displayed door label from the destination", () => {
@@ -177,9 +195,15 @@ describe("room content", () => {
     }
   });
 
-  it("seals home and gives every themed room its own space", () => {
+  it("seals home and gives every themed room four windows", () => {
     expect(ROOMS.home.space).toBeNull();
     expect(ROOMS.home.windows).toHaveLength(0);
+    const windowAngles = ROOM_FACE_ANGLES.filter(
+      (angle) => angle !== 0 && angle !== Math.PI,
+    );
+    for (const id of THEMED_ROOM_ORDER) {
+      expect(ROOMS[id].windows).toEqual(windowAngles);
+    }
 
     const spaces = THEMED_ROOM_ORDER.map((id) => ROOMS[id].space);
     expect(new Set(spaces).size).toBe(THEMED_ROOM_ORDER.length);
