@@ -1,0 +1,3 @@
+portfolio rebuild: cylindrical rooms, seven-door home, consolidated assets
+checks: tsc --noEmit and npm run test pass; lint/build not run
+
