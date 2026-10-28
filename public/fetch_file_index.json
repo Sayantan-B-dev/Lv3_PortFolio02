@@ -1,0 +1,427 @@
+{
+  "version": 5,
+  "generatedAt": "2026-10-28T14:10:50.155Z",
+  "totalFiles": 42,
+  "files": [
+    {
+      "index": 0,
+      "type": "model",
+      "scope": "shared",
+      "tier": "high",
+      "url": "/models/books.glb",
+      "niceName": "Book stack",
+      "size": 5273528,
+      "sizeLabel": "5.27 MB"
+    },
+    {
+      "index": 1,
+      "type": "model",
+      "scope": "shared",
+      "tier": "high",
+      "url": "/models/player.glb",
+      "niceName": "Player",
+      "size": 4752288,
+      "sizeLabel": "4.75 MB"
+    },
+    {
+      "index": 2,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/floor.glb",
+      "niceName": "Floor",
+      "size": 4690964,
+      "sizeLabel": "4.69 MB"
+    },
+    {
+      "index": 3,
+      "type": "model",
+      "scope": "shared",
+      "tier": "high",
+      "url": "/models/classic-table.glb",
+      "niceName": "Reading table",
+      "size": 3181112,
+      "sizeLabel": "3.18 MB"
+    },
+    {
+      "index": 4,
+      "type": "model",
+      "scope": "shared",
+      "tier": "high",
+      "url": "/models/victorian-table.glb",
+      "niceName": "Coffee table",
+      "size": 3091860,
+      "sizeLabel": "3.09 MB"
+    },
+    {
+      "index": 5,
+      "type": "model",
+      "scope": "gallery",
+      "tier": "both",
+      "url": "/models/space2.glb",
+      "niceName": "Gallery backdrop",
+      "size": 3030980,
+      "sizeLabel": "3.03 MB"
+    },
+    {
+      "index": 6,
+      "type": "model",
+      "scope": "playground",
+      "tier": "both",
+      "url": "/models/space5.glb",
+      "niceName": "Playground backdrop",
+      "size": 3030980,
+      "sizeLabel": "3.03 MB"
+    },
+    {
+      "index": 7,
+      "type": "model",
+      "scope": "core",
+      "tier": "both",
+      "url": "/models/space3.glb",
+      "niceName": "Core backdrop",
+      "size": 1811260,
+      "sizeLabel": "1.81 MB"
+    },
+    {
+      "index": 8,
+      "type": "model",
+      "scope": "gateway",
+      "tier": "both",
+      "url": "/models/space6.glb",
+      "niceName": "Gateway backdrop",
+      "size": 1811260,
+      "sizeLabel": "1.81 MB"
+    },
+    {
+      "index": 9,
+      "type": "model",
+      "scope": "playground",
+      "tier": "both",
+      "url": "/models/cat.glb",
+      "niceName": "Floating cat",
+      "size": 1621844,
+      "sizeLabel": "1.62 MB"
+    },
+    {
+      "index": 10,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/rug.glb",
+      "niceName": "Rug",
+      "size": 1590040,
+      "sizeLabel": "1.59 MB"
+    },
+    {
+      "index": 11,
+      "type": "model",
+      "scope": "architect",
+      "tier": "both",
+      "url": "/models/space1.glb",
+      "niceName": "Architect backdrop",
+      "size": 1401564,
+      "sizeLabel": "1.40 MB"
+    },
+    {
+      "index": 12,
+      "type": "model",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/models/space4.glb",
+      "niceName": "Journey backdrop",
+      "size": 1401564,
+      "sizeLabel": "1.40 MB"
+    },
+    {
+      "index": 13,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/cake-table.glb",
+      "niceName": "Round table",
+      "size": 1358968,
+      "sizeLabel": "1.36 MB"
+    },
+    {
+      "index": 14,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/ceiling-tiles.glb",
+      "niceName": "Ceiling tiles",
+      "size": 1338532,
+      "sizeLabel": "1.34 MB"
+    },
+    {
+      "index": 15,
+      "type": "model",
+      "scope": "shared",
+      "tier": "low",
+      "url": "/models/player-low.glb",
+      "niceName": "Player (low)",
+      "size": 1096896,
+      "sizeLabel": "1.10 MB"
+    },
+    {
+      "index": 16,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/frame.glb",
+      "niceName": "Picture frame",
+      "size": 1034140,
+      "sizeLabel": "1.03 MB"
+    },
+    {
+      "index": 17,
+      "type": "model",
+      "scope": "home",
+      "tier": "both",
+      "url": "/models/cat-box.glb",
+      "niceName": "Cat box",
+      "size": 670556,
+      "sizeLabel": "671 KB"
+    },
+    {
+      "index": 18,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/bookcase.glb",
+      "niceName": "Bookcase",
+      "size": 639940,
+      "sizeLabel": "640 KB"
+    },
+    {
+      "index": 19,
+      "type": "model",
+      "scope": "shared",
+      "tier": "low",
+      "url": "/models/books-low.glb",
+      "niceName": "Book stack (low)",
+      "size": 400528,
+      "sizeLabel": "401 KB"
+    },
+    {
+      "index": 20,
+      "type": "model",
+      "scope": "home",
+      "tier": "both",
+      "url": "/models/limca-cat.glb",
+      "niceName": "Limca cat",
+      "size": 394912,
+      "sizeLabel": "395 KB"
+    },
+    {
+      "index": 21,
+      "type": "video",
+      "scope": "architect",
+      "tier": "both",
+      "url": "/images/frames/architect-3.mp4",
+      "niceName": "Architect loop 3",
+      "size": 270329,
+      "sizeLabel": "270 KB"
+    },
+    {
+      "index": 22,
+      "type": "model",
+      "scope": "shared",
+      "tier": "low",
+      "url": "/models/victorian-table-low.glb",
+      "niceName": "Coffee table (low)",
+      "size": 231884,
+      "sizeLabel": "232 KB"
+    },
+    {
+      "index": 23,
+      "type": "model",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/models/chair.glb",
+      "niceName": "Reading chair",
+      "size": 228168,
+      "sizeLabel": "228 KB"
+    },
+    {
+      "index": 24,
+      "type": "image",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/wall-textures/room1.jpg",
+      "niceName": "Plaster wall",
+      "size": 189431,
+      "sizeLabel": "189 KB"
+    },
+    {
+      "index": 25,
+      "type": "video",
+      "scope": "core",
+      "tier": "both",
+      "url": "/images/frames/core-3.mp4",
+      "niceName": "Core loop 3",
+      "size": 178088,
+      "sizeLabel": "178 KB"
+    },
+    {
+      "index": 26,
+      "type": "video",
+      "scope": "core",
+      "tier": "both",
+      "url": "/images/frames/core-1.mp4",
+      "niceName": "Core loop 1",
+      "size": 153140,
+      "sizeLabel": "153 KB"
+    },
+    {
+      "index": 27,
+      "type": "image",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/wall-textures/room3.jpg",
+      "niceName": "Cinema pillar plaster",
+      "size": 140437,
+      "sizeLabel": "140 KB"
+    },
+    {
+      "index": 28,
+      "type": "video",
+      "scope": "core",
+      "tier": "both",
+      "url": "/images/frames/core-2.mp4",
+      "niceName": "Core loop 2",
+      "size": 134135,
+      "sizeLabel": "134 KB"
+    },
+    {
+      "index": 29,
+      "type": "model",
+      "scope": "shared",
+      "tier": "low",
+      "url": "/models/classic-table-low.glb",
+      "niceName": "Reading table (low)",
+      "size": 116912,
+      "sizeLabel": "117 KB"
+    },
+    {
+      "index": 30,
+      "type": "video",
+      "scope": "playground",
+      "tier": "both",
+      "url": "/images/frames/playground-3.mp4",
+      "niceName": "Playground loop 3",
+      "size": 100327,
+      "sizeLabel": "100 KB"
+    },
+    {
+      "index": 31,
+      "type": "image",
+      "scope": "shared",
+      "tier": "both",
+      "url": "/profile/me.webp",
+      "niceName": "Profile photo",
+      "size": 73536,
+      "sizeLabel": "74 KB"
+    },
+    {
+      "index": 32,
+      "type": "video",
+      "scope": "playground",
+      "tier": "both",
+      "url": "/images/frames/playground-2.mp4",
+      "niceName": "Playground loop 2",
+      "size": 70436,
+      "sizeLabel": "70 KB"
+    },
+    {
+      "index": 33,
+      "type": "video",
+      "scope": "architect",
+      "tier": "both",
+      "url": "/images/frames/architect-1.mp4",
+      "niceName": "Architect loop 1",
+      "size": 70345,
+      "sizeLabel": "70 KB"
+    },
+    {
+      "index": 34,
+      "type": "video",
+      "scope": "architect",
+      "tier": "both",
+      "url": "/images/frames/architect-2.mp4",
+      "niceName": "Architect loop 2",
+      "size": 60918,
+      "sizeLabel": "61 KB"
+    },
+    {
+      "index": 35,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/job-ready-ai-powered-cohort.webp",
+      "niceName": "Certificate: Job Ready AI",
+      "size": 59026,
+      "sizeLabel": "59 KB"
+    },
+    {
+      "index": 36,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/the-complete-full-stack-web-development-bootcamp.webp",
+      "niceName": "Certificate: Full-Stack Bootcamp",
+      "size": 32952,
+      "sizeLabel": "33 KB"
+    },
+    {
+      "index": 37,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/the-complete-python-bootcamp.webp",
+      "niceName": "Certificate: Python Bootcamp",
+      "size": 32436,
+      "sizeLabel": "32 KB"
+    },
+    {
+      "index": 38,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/master-the-coding-interview.webp",
+      "niceName": "Certificate: Coding Interview",
+      "size": 31894,
+      "sizeLabel": "32 KB"
+    },
+    {
+      "index": 39,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/javascript-understanding-the-weird-parts.webp",
+      "niceName": "Certificate: JavaScript",
+      "size": 28166,
+      "sizeLabel": "28 KB"
+    },
+    {
+      "index": 40,
+      "type": "image",
+      "scope": "journey",
+      "tier": "both",
+      "url": "/certificates/the-web-developer-bootcamp-2026.webp",
+      "niceName": "Certificate: Web Developer Bootcamp",
+      "size": 26756,
+      "sizeLabel": "27 KB"
+    },
+    {
+      "index": 41,
+      "type": "video",
+      "scope": "playground",
+      "tier": "both",
+      "url": "/images/frames/playground-1.mp4",
+      "niceName": "Playground loop 1",
+      "size": 4671,
+      "sizeLabel": "5 KB"
+    }
+  ]
+}
