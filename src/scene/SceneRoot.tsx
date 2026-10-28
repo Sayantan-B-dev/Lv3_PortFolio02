@@ -20,13 +20,13 @@ import {
   type RoomContent,
   type RoomId,
 } from "@/content/rooms";
-import { DoorChoice } from "@/components/DoorChoice";
 import { IntroOverlay } from "@/components/IntroOverlay";
 import { NoteCard } from "@/components/NoteCard";
 import { OptionsDialog } from "@/components/OptionsDialog";
 import { OrientationGate, useTouchPortrait } from "@/components/OrientationGate";
 import { PauseOverlay } from "@/components/PauseOverlay";
 import { ProfileCard } from "@/components/ProfileCard";
+import { RoomMap } from "@/components/RoomMap";
 import { RenderMetricsBridge, StatsMonitor } from "@/components/StatsMonitor";
 import { TouchJoystick } from "@/components/TouchJoystick";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -94,13 +94,6 @@ function defaultSensitivity() {
 function defaultMoveSpeed() {
   return isCoarsePointer() ? TOUCH_MOVE_SPEED : DEFAULT_MOVE_SPEED;
 }
-
-type DoorChoiceState = {
-  door: DoorSpec;
-  title: string;
-  home: RoomId;
-  next: RoomId | null;
-};
 
 type WebGLStatus = "checking" | "ready" | "unsupported";
 
@@ -226,6 +219,7 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
   const [activeRoom, setActiveRoom] = useState<RoomId>(START_ROOM);
   const [fading, setFading] = useState(false);
   const [focusedDoorId, setFocusedDoorId] = useState<string | null>(null);
+  const [pushing, setPushing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [introFaded, setIntroFaded] = useState(false);
@@ -240,10 +234,10 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
   const [qualityOverride, setQualityOverride] =
     useState<QualityLevel | null>(null);
   const [recentreKey, setRecentreKey] = useState(0);
-  const [doorChoice, setDoorChoice] = useState<DoorChoiceState | null>(null);
+  const [mapOpen, setMapOpen] = useState(false);
   const [openNote, setOpenNote] = useState<NoteContent | null>(null);
   const openNoteRef = useRef<NoteContent | null>(null);
-  const doorChoiceRef = useRef<DoorChoiceState | null>(null);
+  const mapOpenRef = useRef(false);
   const cameraLookRef = useRef<CameraLook>({ yaw: 0, pitch: 0 });
   const moveInputRef = useRef({ x: 0, z: 0 });
   const lookInputRef = useRef({ x: 0, z: 0 });
@@ -298,19 +292,32 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
     window.location.reload();
   }, [portrait]);
 
-  // Walking and the door wait whenever the menu, a note or the door prompt is
-  // open, or the pointer is free, so the pause prompt owns the resume click.
+  // Walking and the door wait whenever the menu, a note or the map is open, or
+  // the pointer is free, so the pause prompt owns the resume click.
   const paused =
     optionsOpen ||
-    Boolean(doorChoice) ||
+    mapOpen ||
     Boolean(openNote) ||
     (!(typeof window !== "undefined" &&
       window.matchMedia("(pointer: coarse)").matches) &&
       !isLocked);
 
-  useEffect(() => {
-    doorChoiceRef.current = doorChoice;
-  }, [doorChoice]);
+  const openMap = useCallback(() => {
+    if (transitionRef.current || mapOpenRef.current) return;
+
+    mapOpenRef.current = true;
+    setMapOpen(true);
+    setFocusedDoorId(null);
+    if (document.pointerLockElement) document.exitPointerLock();
+  }, []);
+
+  const closeMap = useCallback(() => {
+    if (!mapOpenRef.current) return;
+
+    mapOpenRef.current = false;
+    setMapOpen(false);
+    lockRequestRef.current?.(true);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -319,13 +326,32 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
     };
   }, []);
 
-  // Esc opens the menu. While the pointer is locked the browser releases it
-  // first, so the unlock handler covers that case.
+  // M toggles the room map and Esc opens the menu. While the pointer is locked
+  // the browser releases it first, so the unlock handler covers that case.
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "m" || event.key === "M") {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        const target = event.target as HTMLElement | null;
+        if (
+          target &&
+          (target.tagName === "INPUT" ||
+            target.tagName === "TEXTAREA" ||
+            target.isContentEditable)
+        ) {
+          return;
+        }
+        if (optionsOpen || openNoteRef.current) return;
+
+        event.preventDefault();
+        if (mapOpenRef.current) closeMap();
+        else openMap();
+        return;
+      }
+
       if (event.key !== "Escape") return;
 
-      // Esc closes the note card or the door prompt first; the menu is next.
+      // Esc closes the note card or the map first; the menu is next.
       if (openNoteRef.current) {
         event.preventDefault();
         openNoteRef.current = null;
@@ -333,11 +359,9 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
         return;
       }
 
-      if (doorChoiceRef.current) {
+      if (mapOpenRef.current) {
         event.preventDefault();
-        doorChoiceRef.current = null;
-        setDoorChoice(null);
-        lockRequestRef.current?.(true);
+        closeMap();
         return;
       }
 
@@ -359,13 +383,12 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [optionsOpen]);
+  }, [closeMap, openMap, optionsOpen]);
 
   const room = ROOMS[activeRoom];
   const ActiveRoom = ROOM_COMPONENTS[activeRoom];
   const focusedDoor = room.doors.find((door) => door.id === focusedDoorId);
   const roomIndex = ROOM_ORDER.indexOf(activeRoom);
-  const choiceNext = doorChoice?.next ?? null;
 
   const handleSceneWarm = useCallback(() => {
     setSceneReady(true);
@@ -389,9 +412,9 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
     if (locked) return;
 
     lastUnlockAt.current = Date.now();
-    // A note or the door prompt takes the pointer on purpose: opening the menu
-    // on top of them would bury the choice the visitor just asked for.
-    if (openNoteRef.current || doorChoiceRef.current) return;
+    // A note or the map takes the pointer on purpose: opening the menu on top
+    // would bury the choice the visitor just asked for.
+    if (openNoteRef.current || mapOpenRef.current) return;
     setOptionsOpen(true);
   }, []);
 
@@ -472,8 +495,8 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
 
     transitionRef.current = true;
     setFocusedDoorId(null);
-    setDoorChoice(null);
-    doorChoiceRef.current = null;
+    mapOpenRef.current = false;
+    setMapOpen(false);
     const next = ROOMS[target];
 
     const begin = () => {
@@ -532,51 +555,36 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
   const handleDoor = useCallback(
     (door: DoorSpec) => {
       if (transitionRef.current) return;
-
-      if (door.mode === "recenter") {
-        setRecentreKey((key) => key + 1);
-        setFocusedDoorId(null);
-        return;
-      }
-
-      if (door.mode === "choice") {
-        const choice: DoorChoiceState = {
-          door,
-          title: room.title,
-          home: "home",
-          next: room.next ?? null,
-        };
-        doorChoiceRef.current = choice;
-        setDoorChoice(choice);
-        setFocusedDoorId(null);
-        if (document.pointerLockElement) document.exitPointerLock();
-        return;
-      }
-
       goToRoom(door.destination);
-    },
-    [goToRoom, room.next, room.title],
-  );
-
-  const handleChooseRoom = useCallback(
-    (target: RoomId | null) => {
-      if (!target) return;
-      goToRoom(target);
-      lockRequestRef.current?.(true);
     },
     [goToRoom],
   );
 
-  const handleStay = useCallback(() => {
-    setDoorChoice(null);
-    doorChoiceRef.current = null;
-    lockRequestRef.current?.(true);
-  }, []);
+  const handleMapSelect = useCallback(
+    (target: RoomId) => {
+      if (transitionRef.current) return;
+
+      mapOpenRef.current = false;
+      setMapOpen(false);
+
+      // Picking the room you are already in recentres the view.
+      if (target === activeRoom) {
+        setRecentreKey((key) => key + 1);
+        lockRequestRef.current?.(true);
+        return;
+      }
+
+      goToRoom(target);
+      lockRequestRef.current?.(true);
+    },
+    [activeRoom, goToRoom],
+  );
 
   const coarsePointer = isCoarsePointer();
   // The touch HUD has no room for a hint; its controls are on screen and
   // listed in the menu.
-  const movementHint = "WASD walk · Space jumps · E enters · Esc menu";
+  const movementHint =
+    "WASD walk · Space jumps · E enters · M map · Esc menu";
 
   // Upright phones never mount the room; rotating reloads into landscape.
   if (portrait) {
@@ -627,6 +635,7 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
                   paused={paused}
                   fov={fov}
                   onWalkChange={setWalkingActive}
+                  onPushChange={setPushing}
                   cameraLookRef={cameraLookRef}
                   lockRequestRef={lockRequestRef}
                   moveInputRef={moveInputRef}
@@ -638,6 +647,7 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
                   onDoor={handleDoor}
                   onReadNote={handleReadNote}
                   onOpenLink={handleOpenLink}
+                  onOpenMap={openMap}
                   focusedDoorId={focusedDoorId}
                   opening={doorOpening}
                   paused={paused}
@@ -702,6 +712,18 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
                     </p>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={openMap}
+                    aria-label={CONTENT.ui.map.openAria}
+                    className={`pointer-events-auto glass-chip rounded-md font-semibold uppercase tracking-[0.2em] text-[#f6ebdd]/80 transition hover:bg-white/10 hover:text-[#f6ebdd] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c9b8a6] ${
+                      coarsePointer
+                        ? "px-2.5 py-1.5 text-[0.6rem]"
+                        : "px-3 py-2 text-[0.68rem]"
+                    }`}
+                  >
+                    {CONTENT.ui.map.open}
+                  </button>
                 </div>
               </header>
 
@@ -728,7 +750,28 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
                   <kbd className="rounded border border-[#f6ebdd]/25 bg-[#f6ebdd]/10 px-1.5 py-0.5 font-sans text-xs">
                     E
                   </kbd>{" "}
-                  to open {focusedDoor.label}
+                  to enter {focusedDoor.label}
+                </div>
+              ) : null}
+
+              {pushing && !paused ? (
+                <div className="glass-chip absolute left-1/2 top-[64%] flex -translate-x-1/2 items-center gap-2 rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#f6ebdd] shadow-lg">
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 24 24"
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M18 11V6a2 2 0 0 0-4 0v5" />
+                    <path d="M14 10V4a2 2 0 0 0-4 0v6" />
+                    <path d="M10 10.5V6a2 2 0 0 0-4 0v8" />
+                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                  </svg>
+                  <span>{CONTENT.ui.hud.push}</span>
                 </div>
               ) : null}
 
@@ -808,29 +851,18 @@ export default function SceneRoot({ musicTracks }: SceneRootProps) {
             className="pointer-events-none absolute inset-0 z-50 bg-black"
           />
 
-          {sceneReady && introFaded && !optionsOpen && !doorChoice && !isLocked && !openNote && !coarsePointer ? (
+          {sceneReady && introFaded && !optionsOpen && !mapOpen && !isLocked && !openNote && !coarsePointer ? (
             <PauseOverlay
               onResume={() => lockRequestRef.current?.()}
               onOpenMenu={() => setOptionsOpen(true)}
             />
           ) : null}
 
-          {doorChoice ? (
-            <DoorChoice
-              roomTitle={doorChoice.title}
-              homeLabel={CONTENT.ui.doorChoice.home}
-              nextLabel={
-                choiceNext
-                  ? `${CONTENT.ui.doorChoice.next}: ${ROOMS[choiceNext].title}`
-                  : CONTENT.ui.doorChoice.next
-              }
-              stayLabel={CONTENT.ui.doorChoice.close}
-              title={CONTENT.ui.doorChoice.title}
-              onHome={() => handleChooseRoom(doorChoice.home)}
-              onNext={
-                choiceNext ? () => handleChooseRoom(choiceNext) : undefined
-              }
-              onStay={handleStay}
+          {sceneReady && mapOpen ? (
+            <RoomMap
+              current={activeRoom}
+              onSelect={handleMapSelect}
+              onClose={closeMap}
             />
           ) : null}
 

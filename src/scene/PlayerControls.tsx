@@ -10,9 +10,16 @@ import {
 } from "three";
 import type { PointerLockControls as PointerLockControlsImpl } from "three-stdlib";
 import { doorCenter } from "@/components/Door";
-import { ROOM_RADIUS, ROOM_SPAWN } from "@/components/RoomShell";
+import { clampToFloor, ROOM_SPAWN } from "@/components/RoomShell";
 import type { DoorSpec, RoomId } from "@/content/rooms";
 import { FURNITURE } from "@/content/layout";
+import { getCircleColliders } from "@/scene/colliders";
+import {
+  ensurePushable,
+  pushPushable,
+  resetPushables,
+  stepPushables,
+} from "@/scene/pushables";
 
 const PLAYER_HEIGHT = ROOM_SPAWN[1];
 const SPRINT_MULTIPLIER = 1.7;
@@ -62,6 +69,8 @@ type PlayerControlsProps = {
   paused: boolean;
   fov: number;
   onWalkChange?: (walking: boolean) => void;
+  /** True while the walker is shoving a piece of furniture. */
+  onPushChange?: (pushing: boolean) => void;
   cameraLookRef: { current: CameraLook };
   /**
    * Filled with the guarded lock request so the overlays can use it. `force`
@@ -91,6 +100,7 @@ export function PlayerControls({
   paused,
   fov,
   onWalkChange,
+  onPushChange,
   cameraLookRef,
   lockRequestRef,
   moveInputRef,
@@ -107,6 +117,8 @@ export function PlayerControls({
   const lastUnlockAt = useRef(0);
   const walkingRef = useRef(false);
   const walkChangeRef = useRef(onWalkChange);
+  const pushingRef = useRef(false);
+  const pushChangeRef = useRef(onPushChange);
 
   const supportsPointerLock = useMemo(
     () =>
@@ -128,6 +140,10 @@ export function PlayerControls({
   useEffect(() => {
     walkChangeRef.current = onWalkChange;
   }, [onWalkChange]);
+
+  useEffect(() => {
+    pushChangeRef.current = onPushChange;
+  }, [onPushChange]);
 
   useEffect(() => {
     return () => {
@@ -200,6 +216,12 @@ export function PlayerControls({
     cameraLookRef.current.pitch = 0;
     focusedDoorRef.current = null;
     onFocusChange(null);
+
+    resetPushables();
+    if (pushingRef.current) {
+      pushingRef.current = false;
+      pushChangeRef.current?.(false);
+    }
   }, [resetKey, onFocusChange, cameraLookRef]);
 
   useEffect(() => {
@@ -350,36 +372,70 @@ export function PlayerControls({
     const colliders = FURNITURE[roomId];
     const feet = camera.position.y - PLAYER_HEIGHT;
 
-    // Furniture is solid: push the walker out along the shallowest side so a
-    // held key slides around a table instead of passing through it.
+    // Let shoved furniture drift home before testing this frame's contact.
+    stepPushables(step);
+
+    let pushing = false;
+
+    // Furniture yields to the walker: it is shoved away along the shallowest
+    // side and the soft spring later brings it back to its authored spot.
     for (const box of colliders) {
       if (feet >= box.height - 0.03) continue;
 
+      const state = ensurePushable(box.id, box.x, box.z);
       const halfWidth = box.width / 2 + PLAYER_RADIUS;
       const halfDepth = box.depth / 2 + PLAYER_RADIUS;
-      const offsetX = camera.position.x - box.x;
-      const offsetZ = camera.position.z - box.z;
+      const offsetX = camera.position.x - state.x;
+      const offsetZ = camera.position.z - state.z;
       if (Math.abs(offsetX) >= halfWidth || Math.abs(offsetZ) >= halfDepth) {
         continue;
       }
 
+      pushing = true;
       const pushX = halfWidth - Math.abs(offsetX);
       const pushZ = halfDepth - Math.abs(offsetZ);
       if (pushX < pushZ) {
-        camera.position.x += Math.sign(offsetX || 1) * pushX;
+        pushPushable(box.id, box.x, box.z, -Math.sign(offsetX || 1) * pushX, 0);
       } else {
-        camera.position.z += Math.sign(offsetZ || 1) * pushZ;
+        pushPushable(box.id, box.x, box.z, 0, -Math.sign(offsetZ || 1) * pushZ);
+      }
+
+      // If the piece reached its travel limit, the walker takes the remainder.
+      const moved = ensurePushable(box.id, box.x, box.z);
+      const movedX = camera.position.x - moved.x;
+      const movedZ = camera.position.z - moved.z;
+      if (Math.abs(movedX) < halfWidth && Math.abs(movedZ) < halfDepth) {
+        const restX = halfWidth - Math.abs(movedX);
+        const restZ = halfDepth - Math.abs(movedZ);
+        if (restX < restZ) {
+          camera.position.x += Math.sign(movedX || 1) * restX;
+        } else {
+          camera.position.z += Math.sign(movedZ || 1) * restZ;
+        }
       }
     }
 
-    // Keep the walker inside the cylinder, including after a furniture push.
-    const radius = Math.hypot(camera.position.x, camera.position.z);
-    const maxRadius = ROOM_RADIUS - PLAYER_RADIUS;
-    if (radius > maxRadius) {
-      const scale = maxRadius / radius;
-      camera.position.x *= scale;
-      camera.position.z *= scale;
+    // Floating frames publish a solid circle so the walker cannot pass through.
+    for (const collider of getCircleColliders()) {
+      const offsetX = camera.position.x - collider.x;
+      const offsetZ = camera.position.z - collider.z;
+      const minDistance = collider.radius + PLAYER_RADIUS;
+      const distanceSq = offsetX * offsetX + offsetZ * offsetZ;
+      if (distanceSq >= minDistance * minDistance) continue;
+
+      const distance = Math.sqrt(distanceSq) || 0.0001;
+      camera.position.x = collider.x + (offsetX / distance) * minDistance;
+      camera.position.z = collider.z + (offsetZ / distance) * minDistance;
     }
+
+    // Keep the walker on the island, including after a furniture push.
+    const [clampedX, clampedZ] = clampToFloor(
+      camera.position.x,
+      camera.position.z,
+      PLAYER_RADIUS,
+    );
+    camera.position.x = clampedX;
+    camera.position.z = clampedZ;
 
     const walking =
       !pausedRef.current &&
@@ -395,8 +451,13 @@ export function PlayerControls({
     let ground = 0;
     for (const box of colliders) {
       if (!box.standable) continue;
-      if (Math.abs(camera.position.x - box.x) > box.width / 2 + 0.05) continue;
-      if (Math.abs(camera.position.z - box.z) > box.depth / 2 + 0.05) continue;
+      const state = ensurePushable(box.id, box.x, box.z);
+      if (Math.abs(camera.position.x - state.x) > box.width / 2 + 0.05) {
+        continue;
+      }
+      if (Math.abs(camera.position.z - state.z) > box.depth / 2 + 0.05) {
+        continue;
+      }
       if (feet >= box.height - 0.06) ground = Math.max(ground, box.height);
     }
 
@@ -415,6 +476,11 @@ export function PlayerControls({
       verticalVelocity.current = 0;
     } else {
       camera.position.y = ground + PLAYER_HEIGHT;
+    }
+
+    if (pushing !== pushingRef.current) {
+      pushingRef.current = pushing;
+      pushChangeRef.current?.(pushing);
     }
 
     camera.getWorldDirection(lookDirection);
